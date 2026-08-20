@@ -1,0 +1,20 @@
+services:
+  app:
+    build: .
+    image: zoom-booking-sample
+    ports:
+      - "3001:3001"
+    # Secrets come from .env at RUN time — they are never baked into the image.
+    env_file: .env
+    environment:
+      NODE_ENV: production
+      PORT: "3001"
+      TOKEN_STORE_PATH: /data/tokens.json
+    volumes:
+      # Persists OAuth refresh tokens. Without this, every restart forces each
+      # host to re-authorise, because Zoom refresh tokens are single use.
+      - zoom-tokens:/data
+    restart: unless-stopped
+
+volumes:
+  zoom-tokens:

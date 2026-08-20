@@ -1,0 +1,155 @@
+{
+  "display_information": {
+    "display_name": "Zoom Booking Sample",
+    "description": "Book Zoom meetings against a host's real Scheduler availability.",
+    "long_description": "A reference implementation of an end-to-end booking flow: select a host, read their live Zoom Scheduler availability, and book a meeting the host owns. Availability comes from Zoom Scheduler, the meeting is created through the Meetings API, and the busy block is written to the host's Zoom Calendar so the slot stops being offered.",
+    "discover_type": "UNLISTED",
+    "install_type": "APP_DIRECTORY",
+    "marketplace_categories": [
+      "productivity"
+    ],
+    "business_lines": [
+      "other"
+    ],
+    "market_segments": [
+      "enterprise"
+    ],
+    "industry_vertical": "other",
+    "config_url": "",
+    "doc_url": "",
+    "privacy_url": "",
+    "support_url": "",
+    "terms_url": ""
+  },
+  "developer_information": {
+    "contact_details": [
+      {
+        "contact_name": "",
+        "contact_email": "",
+        "role": "Developer"
+      }
+    ]
+  },
+  "oauth_information": {
+    "usage": "USER_OPERATION",
+    "development_redirect_uri": "http://localhost:3001/api/auth/callback",
+    "production_redirect_uri": "http://localhost:3001/api/auth/callback",
+    "oauth_allow_list": [
+      "http://localhost:3001"
+    ],
+    "scope_description": "Read the host's Scheduler booking pages and availability, create the booked Zoom meeting on their behalf, and write the matching busy block to their Zoom Calendar.",
+    "scopes": [
+      {
+        "scope": "user:read:user",
+        "optional": false
+      },
+      {
+        "scope": "scheduler:read:user",
+        "optional": false
+      },
+      {
+        "scope": "scheduler:read:list_schedule",
+        "optional": false
+      },
+      {
+        "scope": "scheduler:read:get_schedule",
+        "optional": false
+      },
+      {
+        "scope": "scheduler:write:scheduled_event",
+        "optional": false
+      },
+      {
+        "scope": "scheduler:read:scheduled_event",
+        "optional": false
+      },
+      {
+        "scope": "scheduler:delete:scheduled_event",
+        "optional": false
+      },
+      {
+        "scope": "scheduler:read:list_availability",
+        "optional": false
+      },
+      {
+        "scope": "scheduler:write:insert_schedule",
+        "optional": false
+      },
+      {
+        "scope": "meeting:write:meeting",
+        "optional": false
+      },
+      {
+        "scope": "meeting:read:meeting",
+        "optional": false
+      },
+      {
+        "scope": "meeting:delete:meeting",
+        "optional": false
+      },
+      {
+        "scope": "calendar:read:list_calendar_lists",
+        "optional": false
+      },
+      {
+        "scope": "calendar:read:list_events",
+        "optional": false
+      },
+      {
+        "scope": "calendar:write:event",
+        "optional": false
+      },
+      {
+        "scope": "calendar:delete:event",
+        "optional": false
+      }
+    ],
+    "strict_mode": true,
+    "subdomain_strict_mode": true
+  },
+  "features": {
+    "products": [
+      "ZOOM_MEETING"
+    ],
+    "event_subscription": {
+      "enable": false,
+      "events": []
+    },
+    "embed": {
+      "meeting_sdk": {
+        "enable": false
+      },
+      "contact_center_sdk": {
+        "enable": false
+      },
+      "phone_sdk": {
+        "enable": false
+      }
+    },
+    "in_client_feature": {
+      "in_client_oauth": {
+        "enable": false
+      },
+      "zoom_app_api": {
+        "enable": false
+      },
+      "guest_mode": {
+        "enable": false
+      }
+    },
+    "team_chat_subscription": {
+      "enable": false
+    },
+    "zoom_client_support": {
+      "mobile": {
+        "enable": false
+      },
+      "pwa_client": {
+        "enable": false
+      },
+      "zoom_room": {
+        "enable": false
+      }
+    }
+  }
+}

@@ -1,0 +1,171 @@
+/**
+ * Step 1 — select a meeting host.
+ *
+ * In Zoom Scheduler a host is reached through their *schedule* (booking page),
+ * not through a Zoom user ID. Listing schedules and reading `organizer` is how
+ * we build the host picker.
+ */
+
+import { config } from '../config.js';
+import { zoomFetch } from './client.js';
+
+/**
+ * The `user` query parameter.
+ *
+ * Zoom documents `user` on both available_times and attendee as "required if
+ * the schedule object contains a `user` field" — but the published schedule
+ * schema has no such field. So we read it defensively off the raw response and
+ * fall back to the slug parsed from `scheduling_url`, which is where it
+ * demonstrably lives. `smoke.js` prints both so the real rule can be confirmed.
+ *
+ * Format is `t/<slug>`; we tolerate a value that already carries the prefix.
+ */
+export function resolveUserParam(rawSchedule) {
+  const explicit = rawSchedule?.user;
+  if (typeof explicit === 'string' && explicit.trim()) {
+    const value = explicit.trim();
+    return value.startsWith('t/') ? value : `t/${value}`;
+  }
+  return null;
+}
+
+/** First path segment of the scheduling URL, e.g. https://scheduler.zoom.us/<slug>/30min */
+export function slugFromSchedulingUrl(schedulingUrl) {
+  if (!schedulingUrl) return null;
+  try {
+    const segments = new URL(schedulingUrl).pathname.split('/').filter(Boolean);
+    return segments[0] ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/** A schedule is bookable-as-a-Zoom-meeting only if all of these hold. */
+export function isBookable(schedule) {
+  return (
+    schedule?.active === true &&
+    schedule?.status === 'confirmed' &&
+    schedule?.add_on_type === 'zoomMeeting'
+  );
+}
+
+/** Trim Zoom's schedule object down to what a booking UI actually needs. */
+export function toHostDto(schedule) {
+  const userParam = resolveUserParam(schedule);
+  const derivedSlug = slugFromSchedulingUrl(schedule.scheduling_url);
+
+  return {
+    scheduleId: schedule.schedule_id,
+    // The slug — NOT schedule_id — is what path-based Scheduler endpoints accept.
+    slug: schedule.slug ?? null,
+    title: schedule.summary,
+    description: schedule.description || null,
+    durationMinutes: schedule.duration,
+    scheduleType: schedule.schedule_type, // 'one' | 'multiple'
+    host: {
+      displayName: schedule.organizer?.display_name ?? schedule.creator?.display_name ?? null,
+      email: schedule.organizer?.email ?? schedule.creator?.email ?? schedule._ownerEmail ?? null,
+    },
+    timeZone: schedule.time_zone ?? null,
+    capacity: schedule.capacity ?? 1,
+    slotIncrementMinutes: schedule.start_time_increment ?? null,
+    minimumNoticeMinutes: schedule.cushion ?? 0,
+    schedulingUrl: schedule.scheduling_url ?? null,
+    ownerUserId: schedule._ownerUserId ?? null,
+    // Questions the booking form must render, ordered as the host arranged them.
+    customFields: (schedule.custom_fields ?? [])
+      .filter((f) => f.enabled)
+      .sort((a, b) => (a.position ?? 0) - (b.position ?? 0))
+      .map((f) => ({
+        id: f.custom_field_id,
+        // NOTE: the booking payload matches answers by this exact string,
+        // case-sensitively — not by id. Carry it through the form verbatim.
+        question: f.name,
+        format: f.format,
+        required: f.required,
+        includeOther: f.include_other,
+        position: f.position,
+        choices: f.answer_choices ?? [],
+      })),
+    _diagnostics: {
+      userParam,
+      derivedSlug,
+      hasExplicitUserField: Object.hasOwn(schedule, 'user'),
+    },
+  };
+}
+
+/**
+ * GET /scheduler/schedules for ONE user.
+ *
+ * ── Verified behaviour, 2026-08-20 ──
+ * Under a Server-to-Server token `account_level=true` returned an empty `items`
+ * array even when schedules existed. Under user-level OAuth we act AS the host,
+ * so no scoping parameter is needed at all — the token itself is the scope.
+ */
+export async function listRawSchedulesForHost(hostId, { pageSize = 100 } = {}) {
+  const items = [];
+  let nextPageToken;
+
+  do {
+    const page = await zoomFetch('/scheduler/schedules', {
+      hostId,
+      query: { page_size: pageSize, next_page_token: nextPageToken },
+    });
+    items.push(...(page?.items ?? []));
+    nextPageToken = page?.next_page_token || undefined;
+  } while (nextPageToken);
+
+  return items;
+}
+
+/**
+ * Every booking page across all connected hosts.
+ *
+ * One request per host, each with that host's own token. A host whose tokens
+ * have expired is reported rather than failing the whole list — one stale
+ * connection must not blank out the picker.
+ *
+ * @param {Array<{userId: string, email: string}>} hosts connected hosts
+ */
+export async function listRawSchedules(hosts) {
+  const perHost = await Promise.all(
+    hosts.map(async (h) => {
+      try {
+        const items = await listRawSchedulesForHost(h.userId);
+        return items.map((s) => ({ ...s, _ownerUserId: h.userId, _ownerEmail: h.email }));
+      } catch (err) {
+        console.error(`[schedules] ${h.email}: ${err.code ?? 'ERROR'} — ${err.detail ?? err.message}`);
+        return [];
+      }
+    })
+  );
+  return perHost.flat();
+}
+
+/** Bookable hosts, shaped for the frontend. */
+export async function listHosts(hosts) {
+  const allowlist = config.demo.allowedScheduleIds;
+  const raw = await listRawSchedules(hosts);
+
+  return raw
+    .filter(isBookable)
+    .filter((s) => allowlist.length === 0 || allowlist.includes(s.schedule_id))
+    .map(toHostDto);
+}
+
+/**
+ * GET /scheduler/schedules/{slug}
+ *
+ * ── Verified behaviour, 2026-08-20 ──
+ * The path parameter is documented as "scheduleId — the unique identifier of the
+ * schedule", but passing the `schedule_id` returned by the list endpoint gives a
+ * flat 404. It wants the `slug` ("scheduling page"). Same for available_times.
+ *
+ * Slugs resolve only within the ACCESS TOKEN OWNER's own Scheduler account —
+ * which is precisely why this app uses user-level OAuth. Pass the hostId whose
+ * token owns the page.
+ */
+export async function getSchedule(hostId, scheduleSlug) {
+  return zoomFetch(`/scheduler/schedules/${encodeURIComponent(scheduleSlug)}`, { hostId });
+}

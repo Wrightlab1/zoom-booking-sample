@@ -1,0 +1,21 @@
+# dependencies
+node_modules/
+
+# secrets — never commit these
+.env
+.env.local
+.env.*.local
+
+# OAuth refresh tokens (encrypted, but still credentials)
+.tokens.json
+*.tokens.json
+
+# build output
+web/dist/
+dist/
+.vite/
+
+# misc
+*.log
+.DS_Store
+coverage/

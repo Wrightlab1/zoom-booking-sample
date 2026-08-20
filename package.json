@@ -1,0 +1,25 @@
+{
+  "name": "zoom-booking-sample",
+  "version": "0.1.0",
+  "private": true,
+  "description": "End-to-end Zoom Scheduler booking workflow: pick a host, list real availability, book a meeting the host owns.",
+  "workspaces": [
+    "server",
+    "web"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace server",
+    "start": "npm run start --workspace server",
+    "smoke": "node --env-file-if-exists=.env server/scripts/smoke.js",
+    "probe:s2s": "node --env-file-if-exists=.env server/scripts/probe-s2s.js",
+    "dev:web": "npm run dev --workspace web",
+    "dev:all": "npm run dev --workspace server & npm run dev --workspace web",
+    "build": "npm run build --workspace web",
+    "app:manifest": "node --env-file-if-exists=.env server/scripts/create-app.js",
+    "app:validate": "node --env-file-if-exists=.env server/scripts/create-app.js --validate",
+    "app:create": "node --env-file-if-exists=.env server/scripts/create-app.js --create"
+  },
+  "engines": {
+    "node": ">=20.6"
+  }
+}
