@@ -12,10 +12,12 @@
    retrying double-books the host. `idempotent: false` marks these calls.
 5. **Persist refresh tokens before returning.** Zoom refresh tokens are single use — each
    refresh invalidates the previous one, so losing the write locks the host out for good.
-6. **The API has no authentication.** Every route is public, including
-   `DELETE /api/auth/hosts/:userId` and `DELETE /api/bookings/:meetingId`. Acceptable for a
-   local sample, not for deployment — see the Security section of README.md. Do not add new
-   operator or destructive routes without raising this.
+6. **The API has no authentication.** The Marketplace app is unlisted, so only users in the
+   creating account can *connect* a Zoom account — but that does not gate HTTP access. Every
+   route is reachable by any caller, including `DELETE /api/auth/hosts/:userId` and
+   `DELETE /api/bookings/:meetingId`, and the caller presents no Zoom credential. Fine on
+   localhost, not behind a tunnel. See the Security section of README.md; do not add operator
+   or destructive routes without raising this.
 
 ## Architecture
 

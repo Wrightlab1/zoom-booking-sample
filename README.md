@@ -474,31 +474,48 @@ What the sample does correctly:
 | CORS bound to a configured origin | Never `*` |
 | Container runs as non-root | `node` user; no credentials baked into the image |
 
-### The API has NO authentication — read this before deploying
+### What the Marketplace app protects
 
-Every route is publicly reachable by anyone who can reach the server. That is deliberate for
-a self-contained sample, and **unacceptable for a public deployment**. Specifically:
+The manifest sets `discover_type: "UNLISTED"`, and the app is unpublished. Zoom therefore
+restricts who can complete the OAuth consent flow to users inside the account that created the
+app. A stranger who reaches `/api/auth/connect` gets bounced by Zoom, not by this app — they
+cannot attach their own Zoom account as a bookable host.
 
-| Route | Exposure |
-|---|---|
-| `DELETE /api/auth/hosts/:userId` | Anyone can disconnect any host. Denial of service. |
-| `DELETE /api/bookings/:meetingId` | Anyone knowing a meeting id can cancel someone's meeting. |
-| `GET /api/bookings/:meetingId` | Insecure direct object reference — returns the join URL and passcode. |
-| `GET /api/health/scheduler-readiness` | Discloses host emails, granted scopes, and token status. |
-| `GET /api/auth/connect` | A stranger can attach *their own* Zoom account as a bookable host. |
-| `POST /api/bookings` | Unauthenticated meeting creation on a real host's calendar, with no rate limit or captcha. |
+That control governs **who can grant the app access to Zoom**. It says nothing about **who can
+call this Express server**.
 
-`GET /api/hosts` and `/slots` are intended to be public — a booking page is public by nature.
-The rest are not.
+### The API itself has no authentication
 
-Before exposing this to the internet:
+Once a host has connected, the app holds their token and acts with it. Every route is reachable
+by anyone who can reach the server, and the caller presents no Zoom credential of any kind — so
+Marketplace scoping does not apply to any of the following:
+
+| Route | Exposure | Mitigated by Marketplace? |
+|---|---|---|
+| `DELETE /api/auth/hosts/:userId` | Disconnect any host. Denial of service. | No |
+| `DELETE /api/bookings/:meetingId` | Cancel anyone's meeting, given its id. | No |
+| `GET /api/bookings/:meetingId` | Insecure direct object reference — returns join URL and passcode. | No |
+| `GET /api/health/scheduler-readiness` | Discloses host emails, granted scopes, token status. | No |
+| `POST /api/bookings` | Writes to a real calendar, no rate limit or captcha. | No — though a booking page is public by design |
+| `GET /api/auth/connect` | Starting the flow is harmless; Zoom refuses to issue a token to anyone outside the account. | **Yes** |
+
+`GET /api/hosts` and `/slots` are meant to be public.
+
+### How much this matters depends on network exposure
+
+Bound to `localhost`, the risk is negligible — the endpoints are unreachable from outside.
+
+The moment the server sits behind a tunnel or a public host — which the OAuth redirect
+effectively requires during development — those endpoints are internet-reachable. Tunnel URLs
+are not a security boundary: they appear in certificate transparency logs and are scanned.
+
+Before exposing this beyond localhost:
 
 1. Put `/api/auth/*`, `/api/health/scheduler-readiness`, and both `/api/bookings/:meetingId`
    methods behind authentication. They are operator endpoints, not visitor endpoints.
 2. Make booking confirmations unguessable — issue an opaque token per booking rather than
    keying on the Zoom meeting id.
-3. Rate-limit `POST /api/bookings` per IP and per email, and add a captcha. Without it the
-   endpoint writes to a real person's calendar on demand.
+3. Rate-limit `POST /api/bookings` per IP and per email, and add a captcha.
 4. Add CSRF protection to the state-changing routes.
 5. Add an audit log of who booked and cancelled what.
 
@@ -541,6 +558,7 @@ booking window are untested.
 (`custCreate`) has no password, cannot sign in, and so never gets a Scheduler profile. Their
 Zoom `type` is still `2` (Licensed), identical to a real user, which makes this hard to spot.
 
-**No authentication on any route**, including destructive and operator endpoints. This is the
-most serious gap in the sample — see [Security](#security) for the exact exposure and what to
-fix before any public deployment.
+**No authentication on any route**, including destructive and operator endpoints. The
+Marketplace app being unlisted restricts who can *connect* a Zoom account, but not who can call
+this server. See [Security](#security) for the exact exposure and what to fix before exposing
+the app beyond localhost.
