@@ -459,6 +459,51 @@ The frontend switches on `code`, never on HTTP status or message text —
 
 ---
 
+## Security
+
+What the sample does correctly:
+
+| | |
+|---|---|
+| Tokens never reach the browser | Every Zoom call is server-side; the client talks only to `/api` |
+| Refresh tokens encrypted at rest | AES-256-GCM with an authenticated tag, file mode `0600` |
+| Single-use refresh handling | The new token is persisted before an access token is returned |
+| OAuth hardening | PKCE (S256) plus a single-use, expiring `state` |
+| `start_url` withheld | It embeds host credentials, so only `join_url` is ever returned |
+| Error detail suppressed in production | Upstream messages are logged, not sent to clients |
+| CORS bound to a configured origin | Never `*` |
+| Container runs as non-root | `node` user; no credentials baked into the image |
+
+### The API has NO authentication — read this before deploying
+
+Every route is publicly reachable by anyone who can reach the server. That is deliberate for
+a self-contained sample, and **unacceptable for a public deployment**. Specifically:
+
+| Route | Exposure |
+|---|---|
+| `DELETE /api/auth/hosts/:userId` | Anyone can disconnect any host. Denial of service. |
+| `DELETE /api/bookings/:meetingId` | Anyone knowing a meeting id can cancel someone's meeting. |
+| `GET /api/bookings/:meetingId` | Insecure direct object reference — returns the join URL and passcode. |
+| `GET /api/health/scheduler-readiness` | Discloses host emails, granted scopes, and token status. |
+| `GET /api/auth/connect` | A stranger can attach *their own* Zoom account as a bookable host. |
+| `POST /api/bookings` | Unauthenticated meeting creation on a real host's calendar, with no rate limit or captcha. |
+
+`GET /api/hosts` and `/slots` are intended to be public — a booking page is public by nature.
+The rest are not.
+
+Before exposing this to the internet:
+
+1. Put `/api/auth/*`, `/api/health/scheduler-readiness`, and both `/api/bookings/:meetingId`
+   methods behind authentication. They are operator endpoints, not visitor endpoints.
+2. Make booking confirmations unguessable — issue an opaque token per booking rather than
+   keying on the Zoom meeting id.
+3. Rate-limit `POST /api/bookings` per IP and per email, and add a captcha. Without it the
+   endpoint writes to a real person's calendar on demand.
+4. Add CSRF protection to the state-changing routes.
+5. Add an audit log of who booked and cancelled what.
+
+---
+
 ## Known limitations
 
 **No hold or reservation API.** Nothing reserves a slot between rendering it and booking it.
@@ -496,5 +541,6 @@ booking window are untested.
 (`custCreate`) has no password, cannot sign in, and so never gets a Scheduler profile. Their
 Zoom `type` is still `2` (Licensed), identical to a real user, which makes this hard to spot.
 
-**Not production-hardened.** No rate limiting on the public booking routes, no CSRF token on
-`POST /api/bookings`, no captcha, no audit log. A public deployment needs all four.
+**No authentication on any route**, including destructive and operator endpoints. This is the
+most serious gap in the sample — see [Security](#security) for the exact exposure and what to
+fix before any public deployment.
