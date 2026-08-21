@@ -1,7 +1,7 @@
 import { Router } from 'express';
 
 import { config } from '../config.js';
-import { listHosts } from '../zoom/schedules.js';
+import { resolveSchedule } from '../zoom/schedules.js';
 import { listConnectedHosts } from '../zoom/tokenStore.js';
 import { createBooking, getBookingConfirmation, cancelBooking } from '../zoom/bookings.js';
 import { AppError, ErrorCode } from '../errors.js';
@@ -14,8 +14,7 @@ bookingsRouter.post('/bookings', async (req, res, next) => {
     const { scheduleSlug, startDateTime, durationMinutes, timeZone, booker, answers } =
       req.body ?? {};
 
-    const hosts = await listHosts(listConnectedHosts());
-    const host = hosts.find((h) => h.slug === scheduleSlug || h.scheduleId === scheduleSlug);
+    const host = await resolveSchedule(listConnectedHosts(), scheduleSlug);
     if (!host) {
       throw new AppError(ErrorCode.NOT_FOUND, 'That booking page is not available.', {
         status: 404,
@@ -24,12 +23,13 @@ bookingsRouter.post('/bookings', async (req, res, next) => {
     }
 
     const { dto } = await createBooking({
-      hostId: host.ownerUserId,
-      scheduleSlug: host.slug,
-      scheduleId: host.scheduleId,
+      hostId: host.hostId,
+      scheduleSlug: host.schedule.slug,
+      scheduleId: host.schedule.schedule_id,
+      rawSchedule: host.schedule,
       startDateTime,
-      durationMinutes: durationMinutes ?? host.durationMinutes,
-      timeZone: timeZone ?? host.timeZone ?? config.demo.defaultTimeZone,
+      durationMinutes: durationMinutes ?? host.schedule.duration,
+      timeZone: timeZone ?? host.schedule.time_zone ?? config.demo.defaultTimeZone,
       booker,
       answers,
     });

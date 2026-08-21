@@ -445,7 +445,7 @@ The OAuth callback at `/` still takes precedence whenever Zoom supplies `?code`.
 | `GET` | `/api/health` | Liveness + connected host count |
 | `GET` | `/api/health/scheduler-readiness` | Per-host tokens, scopes, Scheduler profile |
 | `GET` | `/api/hosts` | Step 1 |
-| `GET` | `/api/hosts/:slug` | Detail, incl. the host's custom questions |
+| `GET` | `/api/hosts/:slug` | Detail, incl. the host's custom questions. Accepts a `schedule_id` too |
 | `GET` | `/api/hosts/:slug/slots` | Step 2 |
 | `POST` | `/api/bookings` | Step 3 |
 | `GET` | `/api/bookings/:meetingId?hostId=` | Confirmation / retry |

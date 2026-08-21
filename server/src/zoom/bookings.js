@@ -63,6 +63,7 @@ async function assertSlotStillFree({ hostId, schedule, startDateTime, timeZone }
  * @param {string} [input.timeZone]
  * @param {{email:string, firstName:string, lastName:string}} input.booker
  * @param {Array<{question:string, answer:string}>} [input.answers]
+ * @param {object} [input.rawSchedule]   pass to avoid re-fetching the schedule
  * @param {boolean} [input.skipAvailabilityCheck]
  */
 export async function createBooking(input) {
@@ -74,6 +75,7 @@ export async function createBooking(input) {
     timeZone,
     booker,
     answers = [],
+    rawSchedule,
     skipAvailabilityCheck = false,
   } = input;
 
@@ -92,7 +94,8 @@ export async function createBooking(input) {
     });
   }
 
-  const schedule = await getSchedule(hostId, scheduleSlug);
+  // Callers that already hold the schedule pass it through, saving a round trip.
+  const schedule = rawSchedule ?? (await getSchedule(hostId, scheduleSlug));
   const zone = timeZone ?? schedule?.time_zone;
 
   if (!skipAvailabilityCheck) {

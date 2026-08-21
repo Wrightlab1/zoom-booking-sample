@@ -171,3 +171,38 @@ export async function listHosts(hosts) {
 export async function getSchedule(hostId, scheduleSlug) {
   return zoomFetch(`/scheduler/schedules/${encodeURIComponent(scheduleSlug)}`, { hostId });
 }
+
+/**
+ * Slug/id → { hostId, raw schedule } resolution, cached briefly.
+ *
+ * Mapping a booking page to the host whose token owns it otherwise costs one
+ * `/scheduler/schedules` call per connected host on EVERY request — N+2 upstream
+ * calls to answer one visitor picking a date.
+ *
+ * Only the mapping is cached. Availability is never cached: it is the one thing
+ * that must be live, since a stale slot is a double-booking.
+ */
+const RESOLVE_TTL_MS = 60_000;
+let resolveCache = { at: 0, bySlug: new Map(), byId: new Map() };
+
+export function invalidateScheduleCache() {
+  resolveCache = { at: 0, bySlug: new Map(), byId: new Map() };
+}
+
+export async function resolveSchedule(hosts, identifier, { force = false } = {}) {
+  const stale = Date.now() - resolveCache.at > RESOLVE_TTL_MS;
+
+  if (force || stale || (!resolveCache.bySlug.has(identifier) && !resolveCache.byId.has(identifier))) {
+    const raw = await listRawSchedules(hosts);
+    const bySlug = new Map();
+    const byId = new Map();
+    for (const schedule of raw.filter(isBookable)) {
+      const entry = { hostId: schedule._ownerUserId, email: schedule._ownerEmail, schedule };
+      if (schedule.slug) bySlug.set(schedule.slug, entry);
+      if (schedule.schedule_id) byId.set(schedule.schedule_id, entry);
+    }
+    resolveCache = { at: Date.now(), bySlug, byId };
+  }
+
+  return resolveCache.bySlug.get(identifier) ?? resolveCache.byId.get(identifier) ?? null;
+}

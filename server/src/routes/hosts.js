@@ -1,7 +1,7 @@
 import { Router } from 'express';
 
 import { config } from '../config.js';
-import { listHosts, getSchedule, toHostDto } from '../zoom/schedules.js';
+import { listHosts, toHostDto, resolveSchedule, invalidateScheduleCache } from '../zoom/schedules.js';
 import { getAvailableTimes, flattenSlots } from '../zoom/availability.js';
 import { listConnectedHosts } from '../zoom/tokenStore.js';
 import { ensureBookingPagesForHosts } from '../zoom/provisioning.js';
@@ -9,14 +9,19 @@ import { AppError, ErrorCode } from '../errors.js';
 
 export const hostsRouter = Router();
 
-/** Resolve a booking page from the list, so we know which host's token owns it. */
-async function findHost(scheduleSlug) {
-  const hosts = await listHosts(listConnectedHosts());
-  const match = hosts.find((h) => h.slug === scheduleSlug || h.scheduleId === scheduleSlug);
+/**
+ * Resolve a booking page to the host whose token owns it.
+ *
+ * Accepts either the slug or the schedule_id — both resolve, and access is
+ * decided by ownership. Backed by a short-lived cache so this does not fan out
+ * across every connected host on each request.
+ */
+async function findHost(identifier) {
+  const match = await resolveSchedule(listConnectedHosts(), identifier);
   if (!match) {
     throw new AppError(ErrorCode.NOT_FOUND, 'That booking page is not available.', {
       status: 404,
-      detail: `No connected host owns a schedule with slug or id "${scheduleSlug}".`,
+      detail: `No connected host owns a schedule with slug or id "${identifier}".`,
     });
   }
   return match;
@@ -52,8 +57,7 @@ hostsRouter.get('/hosts', async (req, res, next) => {
 hostsRouter.get('/hosts/:scheduleSlug', async (req, res, next) => {
   try {
     const known = await findHost(req.params.scheduleSlug);
-    const schedule = await getSchedule(known.ownerUserId, known.slug);
-    res.json({ host: { ...toHostDto(schedule), ownerUserId: known.ownerUserId } });
+    res.json({ host: { ...toHostDto(known.schedule), ownerUserId: known.hostId } });
   } catch (err) {
     next(err);
   }
@@ -69,12 +73,15 @@ hostsRouter.get('/hosts/:scheduleSlug/slots', async (req, res, next) => {
     const to =
       req.query.to ??
       new Date(now.getTime() + config.demo.bookingWindowDays * 86_400_000).toISOString();
-    const timeZone = req.query.timeZone ?? known.timeZone ?? config.demo.defaultTimeZone;
+    const timeZone =
+      req.query.timeZone ?? known.schedule.time_zone ?? config.demo.defaultTimeZone;
 
-    const { response } = await getAvailableTimes(known.ownerUserId, known.slug, {
+    // rawSchedule is already in hand — passing it avoids a redundant fetch.
+    const { response } = await getAvailableTimes(known.hostId, known.schedule.slug, {
       from,
       to,
       timeZone,
+      rawSchedule: known.schedule,
     });
 
     res.json({ ...flattenSlots(response), range: { from, to, timeZone } });
