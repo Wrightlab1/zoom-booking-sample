@@ -56,7 +56,7 @@ function toUtcIso(value) {
 
 /**
  * @param {string} hostId         connected host whose token owns this page
- * @param {string} scheduleSlug  the slug, NOT schedule_id — see getSchedule()
+ * @param {string} scheduleSlug  slug or schedule_id; access is gated by ownership
  * @param {object} opts
  * @param {string|Date} opts.from
  * @param {string|Date} opts.to

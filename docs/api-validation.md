@@ -30,19 +30,34 @@ workflow — see [Why not Server-to-Server](#why-not-server-to-server-oauth).
 
 ## Findings that contradict the spec
 
-### 1. Path parameters want the `slug`, not `schedule_id`
+### 1. Availability is gated by ownership, not by identifier format
 
-`GET /scheduler/schedules/{id}` and `.../{id}/available_times` both return **404** when given
-the `schedule_id` that the list endpoint returns. They resolve the booking page's `slug`.
+`GET /scheduler/schedules/{id}/available_times` accepts **either** the `schedule_id` or the
+`slug`. Access is decided by whether the booking page belongs to the token's user.
 
-```
-GET /scheduler/schedules/ne8cow8bxtzdlk6k1ea6wzdac0/available_times  → 404
-GET /scheduler/schedules/sample-app-demo/available_times             → 200, 10 days, 160 slots
-```
+| Target | `schedule_id` | `slug` |
+|---|---|---|
+| Token owner's page | 200 | 200 |
+| Another user's page | 404 | 404 |
+| Non-existent id | 404 | — |
 
-The spec documents the parameter as *"scheduleId — The unique identifier of the schedule"*.
-Slugs must also be **unique per host**: two hosts sharing a slug is ambiguous and the lookup
-silently resolves to one of them.
+Verified 2026-08-21 under a user-level OAuth token, tracking ids
+`WEB_9bb2620da5c23ce3d140e01d11ef7463` (owner, by id, 200) and
+`WEB_663f8f8a53b88f4c5a4d050918b90147` (non-owner, by id, 404).
+
+**Correction.** This document previously stated that the endpoint required the slug and
+returned 404 for a `schedule_id`. That was a misreading. The original observation was made
+under a Server-to-Server token where the `schedule_id` belonged to a *different* user (404),
+while the slug under test was shared by three hosts and resolved to the token owner's own page
+(200). The 404 was an ownership failure and the 200 was a name collision; neither had anything
+to do with identifier format.
+
+Two things follow, both still true and both worth keeping:
+
+- **Slugs must be unique per host.** A shared slug silently resolves to one host's page, which
+  is how the original mistake happened. `provisioning.js` assigns a distinct slug per host.
+- **Ownership is the real constraint**, and it is what rules out Server-to-Server for this
+  workflow — see [Why not Server-to-Server](#why-not-server-to-server-oauth).
 
 ### 2. `POST /scheduler/attendee` is unusable
 

@@ -43,7 +43,9 @@ as a closed set; the frontend switches on `code`, never on status or message tex
 
 ## Gotchas that have already cost time
 
-- Scheduler path params take the booking page **`slug`**, not `schedule_id`.
+- Scheduler availability accepts **either** `slug` or `schedule_id`; what gates access is
+  **ownership** — another user's page 404s under both. Slugs must be unique per host, or a
+  lookup can silently return the wrong host's page.
 - Slot `start_time` is offset-bearing, never `Z`.
 - `node --check` validates syntax but **not** exports — a stale re-export passes the check
   and fails at runtime. Verify by importing: `node --input-type=module -e "await import('./f.js')"`.

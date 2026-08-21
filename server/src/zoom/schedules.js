@@ -56,7 +56,8 @@ export function toHostDto(schedule) {
 
   return {
     scheduleId: schedule.schedule_id,
-    // The slug — NOT schedule_id — is what path-based Scheduler endpoints accept.
+    // Either identifier works on path-based Scheduler endpoints; the slug is
+    // preferred here because it is stable and readable.
     slug: schedule.slug ?? null,
     title: schedule.summary,
     description: schedule.description || null,
@@ -157,14 +158,15 @@ export async function listHosts(hosts) {
 /**
  * GET /scheduler/schedules/{slug}
  *
- * ── Verified behaviour, 2026-08-20 ──
- * The path parameter is documented as "scheduleId — the unique identifier of the
- * schedule", but passing the `schedule_id` returned by the list endpoint gives a
- * flat 404. It wants the `slug` ("scheduling page"). Same for available_times.
+ * ── Verified behaviour, 2026-08-21 ──
+ * The path parameter accepts EITHER the `slug` or the `schedule_id`. What decides
+ * the outcome is ownership: a page belonging to another user 404s under both
+ * forms. That is precisely why this app uses user-level OAuth — pass the hostId
+ * whose token owns the page.
  *
- * Slugs resolve only within the ACCESS TOKEN OWNER's own Scheduler account —
- * which is precisely why this app uses user-level OAuth. Pass the hostId whose
- * token owns the page.
+ * The slug is used throughout because it is stable and human-readable, not
+ * because the id is rejected. Slugs must be unique per host: a shared slug
+ * silently resolves to one host's page.
  */
 export async function getSchedule(hostId, scheduleSlug) {
   return zoomFetch(`/scheduler/schedules/${encodeURIComponent(scheduleSlug)}`, { hostId });

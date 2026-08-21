@@ -63,14 +63,22 @@ working-hours rules** (`segments_recurrence` keyed by weekday) for configuring a
 It does not subtract existing bookings. Slots generated from it will collide with real
 meetings. This is the single easiest mistake to make in the whole integration.
 
-**Pass the `slug`, not the `schedule_id`.** The spec calls the path parameter *"scheduleId —
-The unique identifier of the schedule"*, but passing the `schedule_id` returned by step 1
-gives a flat 404:
+**Identify the page by `slug` or by `schedule_id` — both work.** What actually governs access
+is **ownership**: the booking page must belong to the user whose token you are using.
 
 ```
-GET /scheduler/schedules/ne8cow8bxtzdlk6k1ea6wzdac0/available_times  → 404
-GET /scheduler/schedules/sample-app-demo/available_times             → 200, 160 slots
+owner's schedule,     by schedule_id → 200
+owner's schedule,     by slug        → 200
+another user's page,  by schedule_id → 404
+another user's page,  by slug        → 404
 ```
+
+An earlier version of this document claimed the endpoint required the slug and rejected
+`schedule_id`. That was wrong, and the mistake is instructive: the original test used a
+non-owner's `schedule_id` (404) against a slug that several hosts shared, and the slug lookup
+silently resolved to the *token owner's* own page (200). A name collision masked an ownership
+failure. If slugs are not unique per host, a lookup can quietly return someone else's schedule
+— which is why `ensureBookingPage()` gives each host a distinct slug.
 
 **Round `from` up to the schedule's increment.** Zoom anchors *every* returned slot to the
 `from` timestamp rather than snapping to the schedule's own grid, so `from = new Date()`

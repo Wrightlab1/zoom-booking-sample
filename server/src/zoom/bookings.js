@@ -57,7 +57,7 @@ async function assertSlotStillFree({ hostId, schedule, startDateTime, timeZone }
 /**
  * @param {object} input
  * @param {string} input.hostId          connected host; becomes the meeting owner
- * @param {string} input.scheduleSlug    booking page slug (NOT schedule_id)
+ * @param {string} input.scheduleSlug    booking page slug (schedule_id also resolves)
  * @param {string} input.startDateTime   ISO 8601, verbatim from an available slot
  * @param {number} input.durationMinutes
  * @param {string} [input.timeZone]
