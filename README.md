@@ -42,7 +42,7 @@ request per connected host and merge.
 | | |
 |---|---|
 | Route | [`routes/hosts.js:26`](server/src/routes/hosts.js#L26) — `GET /api/hosts` |
-| Fan-out | [`zoom/schedules.js:131`](server/src/zoom/schedules.js#L131) — `listRawSchedules()`, one call per host, a failed host is logged not fatal |
+| Fan-out | `listRawSchedules()` in [`zoom/schedules.js`](server/src/zoom/schedules.js) — one call per host, a failed host is logged not fatal |
 | Per host | [`zoom/schedules.js:106`](server/src/zoom/schedules.js#L106) — `listRawSchedulesForHost()` |
 | Filter | [`zoom/schedules.js:44`](server/src/zoom/schedules.js#L44) — `isBookable()`: `active && status==='confirmed' && add_on_type==='zoomMeeting'` |
 | Shape | [`zoom/schedules.js:53`](server/src/zoom/schedules.js#L53) — `toHostDto()`, incl. `customFields` for the form |
@@ -88,7 +88,7 @@ yields `11:49, 12:19, 13:49…` across the entire response — not just a ragged
 
 | | |
 |---|---|
-| Route | [`routes/hosts.js:63`](server/src/routes/hosts.js#L63) — `GET /api/hosts/:scheduleSlug/slots` |
+| Route | `GET /api/hosts/:scheduleSlug/slots` in [`routes/hosts.js`](server/src/routes/hosts.js) — resolves slug→host from a 60s cache |
 | Alignment | [`zoom/availability.js:26`](server/src/zoom/availability.js#L26) — `roundUpToIncrement()` |
 | Fetch | [`zoom/availability.js:66`](server/src/zoom/availability.js#L66) — `getAvailableTimes()` |
 | Flatten | [`zoom/availability.js:105`](server/src/zoom/availability.js#L105) — `flattenSlots()`, keeps only `status === 'available'`; the response's `duration` wins over the schedule's |
@@ -194,7 +194,7 @@ Server-to-Server, for the reasons above.
 **2. Create the app.** Either click through the Marketplace UI, or use the checked-in
 manifest — see [Creating the app from the manifest](#creating-the-app-from-the-manifest) below.
 
-**3. Scopes.** All 16 are user-level — no `:admin`. The app acts *as* the host, so it needs no
+**3. Scopes.** All 13 are user-level — no `:admin`. The app acts *as* the host, so it needs no
 account-wide privilege. Kept in sync in
 [`config.js`](server/src/config.js) as `REQUIRED_SCOPES`.
 
@@ -204,9 +204,6 @@ account-wide privilege. Kept in sync in
 | `scheduler:read:user` | Their Scheduler profile and slug |
 | `scheduler:read:list_schedule` | Step 1 — list booking pages |
 | `scheduler:read:get_schedule` | Step 2 — `available_times` **and** schedule detail |
-| `scheduler:write:scheduled_event` | Reserved for the Scheduler booking path |
-| `scheduler:read:scheduled_event` | Reserved |
-| `scheduler:delete:scheduled_event` | Reserved |
 | `scheduler:read:list_availability` | Provisioning reads working hours |
 | `scheduler:write:insert_schedule` | Provisioning creates a booking page |
 | `meeting:write:meeting` | Step 3 — create the meeting |
@@ -216,6 +213,9 @@ account-wide privilege. Kept in sync in
 | `calendar:read:list_events` | Verify the slot got blocked |
 | `calendar:write:event` | Step 3 — write the busy block |
 | `calendar:delete:event` | Remove it on cancel |
+
+No `scheduler:*:scheduled_event` scopes are requested: step 3 uses the Meetings API, so the app
+never touches a Scheduler "scheduled event" and should not hold the permission.
 
 If the consent screen grants fewer than requested, `GET /api/health/scheduler-readiness`
 reports exactly which are missing per host.
@@ -239,6 +239,11 @@ npm run app:manifest      # regenerate manifest/app-manifest.json and print a su
 npm run app:validate      # check it against Zoom (does NOT create anything)
 npm run app:create        # validate, then create the app
 ```
+
+The committed copy is environment-neutral (`http://localhost:3001/api/auth/callback`). Note that
+`app:validate` and `app:create` load `.env` and rewrite the file with *your* redirect URI — check
+`git diff manifest/` before committing after running either, and regenerate with
+`node server/scripts/create-app.js` to restore the neutral form.
 
 The redirect URI, app name, and contact fields come from the environment, so the same manifest
 serves every developer:
@@ -425,6 +430,10 @@ connected-host count only — an unreachable Zoom must not mark the container un
 
 **`dumb-init` is PID 1** so `docker stop` terminates promptly instead of waiting out the
 10-second SIGKILL timeout.
+
+**The slug→host cache is per process.** Running several replicas simply means each keeps its
+own 60-second copy of the mapping. Availability is never cached, so replicas cannot disagree
+about what is bookable — only about which pages exist, and only for a minute after a change.
 
 ### Serving the UI locally
 

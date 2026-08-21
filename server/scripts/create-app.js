@@ -6,6 +6,11 @@
  * app's scopes can never drift from what the code actually calls. Never hand-edit
  * the scope list here.
  *
+ * The committed manifest/app-manifest.json must stay environment-neutral. Running
+ * `npm run app:validate|app:create` loads .env and therefore writes YOUR redirect
+ * URI into the file — check `git diff manifest/` before committing after either.
+ * `node server/scripts/create-app.js` (no --env-file) restores the neutral form.
+ *
  * Usage:
  *   npm run app:manifest              write manifest/app-manifest.json and print it
  *   npm run app:validate              validate it against Zoom
@@ -296,7 +301,17 @@ async function main() {
   );
 }
 
-main().catch((err) => {
-  console.error(`\n✖ ${err.message}\n`);
-  process.exit(1);
-});
+/**
+ * Only run when invoked directly. Importing this module — a test harness, an
+ * import-graph check, another script reusing buildManifest() — must not rewrite
+ * manifest/app-manifest.json as a side effect.
+ */
+const invokedDirectly =
+  process.argv[1] && import.meta.url === new URL(`file://${process.argv[1]}`).href;
+
+if (invokedDirectly) {
+  main().catch((err) => {
+    console.error(`\n✖ ${err.message}\n`);
+    process.exit(1);
+  });
+}

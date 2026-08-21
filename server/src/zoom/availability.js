@@ -11,7 +11,7 @@
 
 import { AppError, ErrorCode } from '../errors.js';
 import { zoomFetch } from './client.js';
-import { getSchedule, resolveUserParam } from './schedules.js';
+import { getSchedule } from './schedules.js';
 
 /**
  * Zoom anchors EVERY returned slot to the `from` timestamp — it does not snap
@@ -75,7 +75,6 @@ export async function getAvailableTimes(hostId, scheduleSlug, { from, to, timeZo
   }
 
   const schedule = rawSchedule ?? (await getSchedule(hostId, scheduleSlug));
-  const userParam = resolveUserParam(schedule);
 
   const increment = schedule?.start_time_increment ?? schedule?.duration ?? 15;
   const alignedFrom = roundUpToIncrement(new Date(fromIso), increment).toISOString();
@@ -88,12 +87,11 @@ export async function getAvailableTimes(hostId, scheduleSlug, { from, to, timeZo
         from: alignedFrom,
         to: toIso,
         time_zone: timeZone,
-        user: userParam ?? undefined,
       },
     }
   );
 
-  return { response, userParam, schedule };
+  return { response, schedule };
 }
 
 /**

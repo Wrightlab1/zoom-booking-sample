@@ -95,7 +95,7 @@ export function getHostRecord(userId) {
   return readAll()[userId] ?? null;
 }
 
-export function listHostRecords() {
+function listHostRecords() {
   return Object.values(readAll());
 }
 

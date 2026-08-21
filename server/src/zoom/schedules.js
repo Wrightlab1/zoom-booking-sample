@@ -9,37 +9,6 @@
 import { config } from '../config.js';
 import { zoomFetch } from './client.js';
 
-/**
- * The `user` query parameter.
- *
- * Zoom documents `user` on both available_times and attendee as "required if
- * the schedule object contains a `user` field" — but the published schedule
- * schema has no such field. So we read it defensively off the raw response and
- * fall back to the slug parsed from `scheduling_url`, which is where it
- * demonstrably lives. `smoke.js` prints both so the real rule can be confirmed.
- *
- * Format is `t/<slug>`; we tolerate a value that already carries the prefix.
- */
-export function resolveUserParam(rawSchedule) {
-  const explicit = rawSchedule?.user;
-  if (typeof explicit === 'string' && explicit.trim()) {
-    const value = explicit.trim();
-    return value.startsWith('t/') ? value : `t/${value}`;
-  }
-  return null;
-}
-
-/** First path segment of the scheduling URL, e.g. https://scheduler.zoom.us/<slug>/30min */
-export function slugFromSchedulingUrl(schedulingUrl) {
-  if (!schedulingUrl) return null;
-  try {
-    const segments = new URL(schedulingUrl).pathname.split('/').filter(Boolean);
-    return segments[0] ?? null;
-  } catch {
-    return null;
-  }
-}
-
 /** A schedule is bookable-as-a-Zoom-meeting only if all of these hold. */
 export function isBookable(schedule) {
   return (
@@ -51,9 +20,6 @@ export function isBookable(schedule) {
 
 /** Trim Zoom's schedule object down to what a booking UI actually needs. */
 export function toHostDto(schedule) {
-  const userParam = resolveUserParam(schedule);
-  const derivedSlug = slugFromSchedulingUrl(schedule.scheduling_url);
-
   return {
     scheduleId: schedule.schedule_id,
     // Either identifier works on path-based Scheduler endpoints; the slug is
@@ -88,11 +54,6 @@ export function toHostDto(schedule) {
         position: f.position,
         choices: f.answer_choices ?? [],
       })),
-    _diagnostics: {
-      userParam,
-      derivedSlug,
-      hasExplicitUserField: Object.hasOwn(schedule, 'user'),
-    },
   };
 }
 

@@ -30,14 +30,13 @@ export const REQUIRED_SCOPES = [
   'scheduler:read:user',                // their Scheduler profile + slug
   'scheduler:read:list_schedule',       // step 1 — their booking pages
   'scheduler:read:get_schedule',        // step 2 — available_times
-  'scheduler:write:scheduled_event',    // step 3 — create the booking
-  'scheduler:read:scheduled_event',     // step 3 — meeting join details
-  'scheduler:delete:scheduled_event',   // cancellation
   'scheduler:read:list_availability',   // provisioning reads working hours
   'scheduler:write:insert_schedule',    // provisioning creates a booking page
 
-  // Step 3 runs through the Meetings API, not POST /scheduler/attendee, which
-  // rejects every payload. See zoom/meetings.js for the full reasoning.
+  // NOTE: no scheduler:*:scheduled_event scopes. Step 3 runs through the
+  // Meetings API because POST /scheduler/attendee rejects every payload, so the
+  // app never touches a Scheduler "scheduled event" and must not ask for the
+  // permission. See zoom/meetings.js.
   'meeting:write:meeting',              // create the booking's Zoom meeting
   'meeting:read:meeting',               // confirmation lookups
   'meeting:delete:meeting',             // cancellation

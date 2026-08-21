@@ -18,7 +18,7 @@ import { zoomFetch } from './client.js';
 /** Marker embedded in the description so a booking's event can be found later. */
 const MARKER = 'zoom-booking-sample:meeting:';
 
-export function markerFor(meetingId) {
+function markerFor(meetingId) {
   return `${MARKER}${meetingId}`;
 }
 

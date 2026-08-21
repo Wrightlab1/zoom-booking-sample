@@ -56,18 +56,6 @@
         "optional": false
       },
       {
-        "scope": "scheduler:write:scheduled_event",
-        "optional": false
-      },
-      {
-        "scope": "scheduler:read:scheduled_event",
-        "optional": false
-      },
-      {
-        "scope": "scheduler:delete:scheduled_event",
-        "optional": false
-      },
-      {
         "scope": "scheduler:read:list_availability",
         "optional": false
       },

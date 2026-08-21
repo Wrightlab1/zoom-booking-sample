@@ -16,7 +16,7 @@
 
 import { zoomFetch } from './client.js';
 
-export const LoginType = {
+const LoginType = {
   FACEBOOK: 0,
   GOOGLE: 1,
   APPLE: 24,
@@ -28,17 +28,17 @@ export const LoginType = {
   SSO: 101,
 };
 
-export function isApiOnlyUser(user) {
+function isApiOnlyUser(user) {
   return (user?.login_types ?? []).includes(LoginType.API_USER);
 }
 
 /** GET /users/me — the identity behind the token we just obtained. */
-export async function getMe(hostId) {
+async function getMe(hostId) {
   return zoomFetch('/users/me', { hostId });
 }
 
 /** GET /scheduler/users/{userId} — Scheduler profile (slug, scheduling_url). */
-export async function getSchedulerProfile(hostId, userId = 'me') {
+async function getSchedulerProfile(hostId, userId = 'me') {
   try {
     return await zoomFetch(`/scheduler/users/${encodeURIComponent(userId)}`, { hostId });
   } catch (err) {
